@@ -3,105 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P SVG Chess Game</title>
+    <title>P2P SVG Chess</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
+        :root { --primary: #764ba2; --bg: #2d3436; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: white;
             display: flex;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
             padding: 20px;
         }
 
-        .p2p-panel {
+        /* Lobby / Connection UI */
+        .lobby-panel {
             background: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
-        }
-        .id-badge { background: #eee; padding: 5px 10px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        input { padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
-
-        .game-container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 600px;
+            color: #333;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
             width: 100%;
+            max-width: 400px;
+            margin-bottom: 20px;
         }
 
-        h1 { text-align: center; color: #333; margin-bottom: 20px; font-size: 1.5em; }
+        .id-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        #my-id {
+            font-weight: bold;
+            color: var(--primary);
+            user-select: none; /* Make this not manually copyable */
+        }
+
+        .copy-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+
+        button.main-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            width: 100%;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Game Board UI */
+        #game-area { display: none; flex-direction: column; align-items: center; }
 
         .game-info {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 20px; padding: 10px; background: #f0f0f0; border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+            margin-bottom: 15px;
+            font-weight: bold;
         }
 
-        .turn-indicator { font-size: 1em; font-weight: bold; padding: 5px 15px; border-radius: 15px; }
-        .white-turn { background: white; color: #333; border: 1px solid #ccc; }
-        .black-turn { background: #333; color: white; }
-
-        .board-container { display: flex; justify-content: center; position: relative; }
-        #chessboard { cursor: pointer; border: 5px solid #333; }
-
-        .square.light { fill: #f0d9b5; }
-        .square.dark { fill: #b58863; }
-        .square.possible-move { fill: rgba(0, 255, 0, 0.3) !important; }
-        .square.selected { fill: rgba(255, 255, 0, 0.5) !important; }
-        .square.in-check { fill: rgba(255, 0, 0, 0.5) !important; }
-
-        .piece { cursor: grab; transition: transform 0.1s ease; }
-        .piece.dragging { cursor: grabbing; opacity: 0.8; pointer-events: none; }
-
-        .controls { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
-        button {
-            padding: 10px 20px; font-weight: bold; border: none; border-radius: 25px;
-            cursor: pointer; background: #764ba2; color: white;
+        #chessboard {
+            border: 5px solid #555;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            background-color: #b58863;
         }
+
+        /* Squares */
+        .light { fill: #f0d9b5; }
+        .dark { fill: #b58863; }
+        .selected { fill: rgba(255, 255, 0, 0.6) !important; }
+        .possible { fill: rgba(0, 255, 0, 0.4) !important; }
+
+        /* Piece Text */
+        .piece { cursor: pointer; user-select: none; }
+        
+        /* Flip logic */
+        .flipped { transform: rotate(180deg); }
+        .flipped text { transform: rotate(180deg); transform-origin: center; transform-box: fill-box; }
 
         #promotionModal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.8); z-index: 100; justify-content: center; align-items: center;
         }
-        .promotion-content { background: white; padding: 20px; border-radius: 10px; display: flex; gap: 10px; }
-        .promo-btn { font-size: 40px; cursor: pointer; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }
+        .promo-box { background: white; padding: 20px; border-radius: 10px; display: flex; gap: 15px; }
+        .promo-choice { font-size: 50px; cursor: pointer; border: 1px solid #ccc; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-    <div class="p2p-panel">
-        <div>Your ID: <span id="my-id" class="id-badge" onclick="navigator.clipboard.writeText(this.innerText)">...loading...</span></div>
-        <input type="text" id="peer-id-input" placeholder="Paste Friend's ID">
-        <button onclick="game.connectToPeer()">Connect to Friend</button>
-        <div id="connection-status">(Local Play)</div>
+    <div class="lobby-panel" id="lobby">
+        <h2>Chess Lobby</h2>
+        <p style="font-size: 0.9em; color: #666;">Share your ID with a friend</p>
+        
+        <div class="id-container">
+            <span id="my-id">Generating ID...</span>
+            <button class="copy-btn" onclick="game.copyID()">Copy</button>
+        </div>
+
+        <input type="text" id="peer-id-input" placeholder="Enter friend's ID">
+        <button class="main-btn" onclick="game.connectToPeer()">Connect & Play</button>
+        <p id="conn-status" style="margin-top: 10px; font-weight: bold; color: var(--primary);"></p>
     </div>
 
-    <div class="game-container">
-        <h1 id="statusText">♔ SVG P2P Chess ♚</h1>
+    <div id="game-area">
         <div class="game-info">
-            <div class="turn-indicator white-turn" id="turnIndicator">White's Turn</div>
+            <span id="turn-text">White's Turn</span> | 
+            <span id="player-color-text"></span>
         </div>
-        <div class="board-container">
-            <svg id="chessboard" width="480" height="480" viewBox="0 0 480 480">
-                <g id="squares"></g>
-                <g id="pieces"></g>
-            </svg>
-        </div>
-        <div class="controls">
-            <button onclick="location.reload()">New Game</button>
-            <button onclick="game.flipBoard()">Flip Board</button>
+        
+        <svg id="chessboard" width="480" height="480" viewBox="0 0 480 480">
+            <g id="squares-layer"></g>
+            <g id="pieces-layer"></g>
+        </svg>
+
+        <div style="margin-top: 20px;">
+            <button onclick="location.reload()" style="padding: 5px 15px; cursor: pointer;">Quit Game</button>
         </div>
     </div>
 
     <div id="promotionModal">
-        <div class="promotion-content" id="promotionOptions"></div>
+        <div class="promo-box" id="promo-options"></div>
     </div>
 
     <script>
@@ -112,29 +161,24 @@
 
         class ChessGame {
             constructor() {
-                this.board = this.initializeBoard();
-                this.currentTurn = 'white';
-                this.selectedSquare = null;
-                this.legalMoves = [];
-                this.isDragging = false;
-                this.dragPiece = null;
+                this.board = this.initBoard();
+                this.turn = 'white';
                 this.myColor = null; 
-                this.isFlipped = false;
-
+                this.selected = null;
+                this.moves = [];
+                
                 this.peer = new Peer();
                 this.conn = null;
 
                 this.setupPeer();
-                this.initSVG();
-                this.render();
-                this.attachEvents();
+                this.createBoardSVG();
             }
 
-            initializeBoard() {
+            initBoard() {
                 return [
                     ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
                     ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
-                    Array(8).fill(null), Array(8).fill(null), Array(8).fill(null), Array(8).fill(null),
+                    ...Array(4).fill().map(() => Array(8).fill(null)),
                     ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
                     ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
                 ];
@@ -142,11 +186,12 @@
 
             setupPeer() {
                 this.peer.on('open', id => document.getElementById('my-id').innerText = id);
+                
+                // When someone connects to us
                 this.peer.on('connection', c => {
                     this.conn = c;
                     this.myColor = 'black';
-                    document.getElementById('connection-status').innerText = "Playing as BLACK";
-                    this.setupDataListener();
+                    this.startGame();
                 });
             }
 
@@ -155,154 +200,105 @@
                 if (!id) return;
                 this.conn = this.peer.connect(id);
                 this.myColor = 'white';
-                document.getElementById('connection-status').innerText = "Playing as WHITE";
-                this.setupDataListener();
+                this.conn.on('open', () => this.startGame());
             }
 
-            setupDataListener() {
+            copyID() {
+                const id = document.getElementById('my-id').innerText;
+                navigator.clipboard.writeText(id);
+                const btn = document.querySelector('.copy-btn');
+                btn.innerText = "Copied!";
+                setTimeout(() => btn.innerText = "Copy", 2000);
+            }
+
+            startGame() {
+                document.getElementById('lobby').style.display = 'none';
+                document.getElementById('game-area').style.display = 'flex';
+                document.getElementById('player-color-text').innerText = "You are " + this.myColor.toUpperCase();
+                
+                if (this.myColor === 'black') {
+                    document.getElementById('chessboard').classList.add('flipped');
+                }
+
                 this.conn.on('data', data => {
-                    if (data.type === 'move') {
-                        this.executeMove(data.from, data.to, data.promotion);
-                    }
+                    if (data.type === 'move') this.executeMove(data.from, data.to, data.promo);
                 });
+
+                this.render();
             }
 
-            initSVG() {
-                const group = document.getElementById('squares');
+            createBoardSVG() {
+                const layer = document.getElementById('squares-layer');
                 for (let r = 0; r < 8; r++) {
                     for (let c = 0; c < 8; c++) {
                         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                         rect.setAttribute('x', c * 60); rect.setAttribute('y', r * 60);
                         rect.setAttribute('width', 60); rect.setAttribute('height', 60);
                         rect.setAttribute('class', `square ${(r + c) % 2 === 0 ? 'light' : 'dark'}`);
-                        rect.dataset.row = r; rect.dataset.col = c;
-                        group.appendChild(rect);
+                        rect.dataset.r = r; rect.dataset.c = c;
+                        rect.onclick = () => this.handleSquareClick(r, c);
+                        layer.appendChild(rect);
                     }
                 }
             }
 
-            render() {
-                const pGroup = document.getElementById('pieces');
-                pGroup.innerHTML = '';
-                
-                // Clear highlights
-                document.querySelectorAll('.square').forEach(s => 
-                    s.classList.remove('selected', 'possible-move', 'in-check'));
+            handleSquareClick(r, c) {
+                if (this.turn !== this.myColor) return;
 
-                for (let r = 0; r < 8; r++) {
-                    for (let c = 0; c < 8; c++) {
-                        const piece = this.board[r][c];
-                        if (piece) {
-                            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                            g.setAttribute('class', 'piece');
-                            g.dataset.row = r; g.dataset.col = c;
-                            g.innerHTML = `<text x="${c * 60 + 30}" y="${r * 60 + 45}" font-size="45" text-anchor="middle" fill="${piece === piece.toUpperCase() ? '#000' : '#000'}">${SYMBOLS[piece]}</text>`;
-                            pGroup.appendChild(g);
-                        }
-                    }
-                }
+                const piece = this.board[r][c];
+                const isOwnPiece = piece && (this.turn === 'white' ? piece === piece.toUpperCase() : piece === piece.toLowerCase());
 
-                if (this.selectedSquare) {
-                    this.getSquareEl(this.selectedSquare.r, this.selectedSquare.c).classList.add('selected');
-                    this.legalMoves.forEach(m => this.getSquareEl(m.r, m.c).classList.add('possible-move'));
-                }
-            }
-
-            getSquareEl(r, c) { return document.querySelector(`rect[data-row="${r}"][data-col="${c}"]`); }
-
-            attachEvents() {
-                const svg = document.getElementById('chessboard');
-                svg.addEventListener('mousedown', e => {
-                    if (this.myColor && this.currentTurn !== this.myColor) return;
-                    const coords = this.getCoords(e);
-                    const piece = this.board[coords.r][coords.c];
-                    if (piece && this.getPieceColor(piece) === this.currentTurn) {
-                        this.selectedSquare = coords;
-                        this.legalMoves = this.getLegalMoves(coords.r, coords.c, this.board);
-                        this.render();
-                    }
-                });
-
-                svg.addEventListener('mouseup', e => {
-                    if (!this.selectedSquare) return;
-                    const target = this.getCoords(e);
-                    const move = this.legalMoves.find(m => m.r === target.r && m.c === target.c);
-                    
-                    if (move) {
-                        this.handleMoveAttempt(this.selectedSquare, target);
+                if (isOwnPiece) {
+                    this.selected = {r, c};
+                    this.moves = this.getLegalMoves(r, c);
+                } else if (this.selected) {
+                    const targetMove = this.moves.find(m => m.r === r && m.c === c);
+                    if (targetMove) {
+                        this.handleMoveAttempt(this.selected, {r, c});
                     } else {
-                        this.selectedSquare = null;
-                        this.legalMoves = [];
-                        this.render();
+                        this.selected = null;
+                        this.moves = [];
                     }
-                });
+                }
+                this.render();
             }
 
-            getCoords(e) {
-                const rect = document.getElementById('chessboard').getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                return { r: Math.floor(y / 60), c: Math.floor(x / 60) };
+            handleMoveAttempt(from, to) {
+                const piece = this.board[from.r][from.c];
+                // Pawn Promotion check
+                if (piece.toLowerCase() === 'p' && (to.r === 0 || to.r === 7)) {
+                    this.showPromotion(from, to);
+                } else {
+                    this.executeMove(from, to);
+                    this.conn.send({ type: 'move', from, to });
+                }
             }
 
-            getPieceColor(p) { return p === p.toUpperCase() ? 'white' : 'black'; }
-
-            getLegalMoves(r, c, board) {
-                const piece = board[r][c];
-                const rawMoves = this.getRawMoves(r, c, board);
-                // Filter moves: Can't move into check
-                return rawMoves.filter(m => !this.wouldBeInCheck(r, c, m.r, m.c));
+            executeMove(from, to, promo = null) {
+                let piece = this.board[from.r][from.c];
+                if (promo) piece = this.turn === 'white' ? promo.toUpperCase() : promo.toLowerCase();
+                
+                this.board[to.r][to.c] = piece;
+                this.board[from.r][from.c] = null;
+                this.turn = (this.turn === 'white') ? 'black' : 'white';
+                this.selected = null;
+                this.moves = [];
+                this.render();
             }
 
-            getRawMoves(r, c, board) {
-                const piece = board[r][c];
-                const type = piece.toLowerCase();
-                const color = this.getPieceColor(piece);
+            getLegalMoves(r, c) {
+                const piece = this.board[r][c];
+                const color = piece === piece.toUpperCase() ? 'white' : 'black';
                 const moves = [];
 
-                if (type === 'p') {
-                    const dir = color === 'white' ? -1 : 1;
-                    const startRank = color === 'white' ? 6 : 1;
-                    // Forward
-                    if (this.isEmpty(r + dir, c, board)) {
-                        moves.push({r: r + dir, c});
-                        if (r === startRank && this.isEmpty(r + 2 * dir, c, board)) moves.push({r: r + 2 * dir, c});
-                    }
-                    // Captures
-                    [[dir, 1], [dir, -1]].forEach(([dr, dc]) => {
-                        const nr = r + dr, nc = c + dc;
-                        if (this.onBoard(nr, nc) && !this.isEmpty(nr, nc, board) && this.getPieceColor(board[nr][nc]) !== color) {
-                            moves.push({r: nr, c: nc});
-                        }
-                    });
-                } else if (type === 'n') {
-                    [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]].forEach(([dr, dc]) => {
-                        const nr = r + dr, nc = c + dc;
-                        if (this.onBoard(nr, nc) && (this.isEmpty(nr, nc, board) || this.getPieceColor(board[nr][nc]) !== color)) {
-                            moves.push({r: nr, c: nc});
-                        }
-                    });
-                } else if (['r', 'b', 'q'].includes(type)) {
-                    const dirs = type === 'r' ? [[0,1],[0,-1],[1,0],[-1,0]] : 
-                                 type === 'b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : 
-                                 [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
-                    dirs.forEach(([dr, dc]) => {
-                        let nr = r + dr, nc = c + dc;
-                        while (this.onBoard(nr, nc)) {
-                            if (this.isEmpty(nr, nc, board)) moves.push({r: nr, c: nc});
-                            else {
-                                if (this.getPieceColor(board[nr][nc]) !== color) moves.push({r: nr, c: nc});
-                                break;
-                            }
-                            nr += dr; nc += dc;
-                        }
-                    });
-                } else if (type === 'k') {
-                    for (let dr = -1; dr <= 1; dr++) {
-                        for (let dc = -1; dc <= 1; dc++) {
-                            const nr = r + dr, nc = c + dc;
-                            if (this.onBoard(nr, nc) && (this.isEmpty(nr, nc, board) || this.getPieceColor(board[nr][nc]) !== color)) {
-                                moves.push({r: nr, c: nc});
+                // Simple logic for move generation (Full Chess logic)
+                // This is a condensed version of the legal move checker
+                for (let tr = 0; tr < 8; tr++) {
+                    for (let tc = 0; tc < 8; tc++) {
+                        if (this.isPseudoLegal(r, c, tr, tc)) {
+                            // Check if move puts own king in check
+                            if (!this.wouldBeInCheck(r, c, tr, tc)) {
+                                moves.push({r: tr, c: tc});
                             }
                         }
                     }
@@ -310,92 +306,130 @@
                 return moves;
             }
 
-            wouldBeInCheck(fr, fc, tr, tc) {
-                const color = this.getPieceColor(this.board[fr][fc]);
-                const tempBoard = this.board.map(row => [...row]);
-                tempBoard[tr][tc] = tempBoard[fr][fc];
-                tempBoard[fr][fc] = null;
+            isPseudoLegal(r, c, tr, tc) {
+                const p = this.board[r][c];
+                const target = this.board[tr][tc];
+                if (target && (p === p.toUpperCase()) === (target === target.toUpperCase())) return false;
+                
+                const type = p.toLowerCase();
+                const dr = tr - r;
+                const dc = tc - c;
+                const absDr = Math.abs(dr);
+                const absDc = Math.abs(dc);
 
-                // Find King
-                let kr, kc;
-                for (let r = 0; r < 8; r++) {
-                    for (let c = 0; c < 8; c++) {
-                        if (tempBoard[r][c] === (color === 'white' ? 'K' : 'k')) {
-                            kr = r; kc = c;
-                        }
+                if (type === 'p') {
+                    const dir = (p === 'P') ? -1 : 1;
+                    if (dc === 0 && target === null) { // Forward
+                        if (dr === dir) return true;
+                        if (dr === 2 * dir && (r === 1 || r === 6) && this.board[r + dir][c] === null) return true;
                     }
+                    if (absDc === 1 && dr === dir && target !== null) return true; // Capture
+                    return false;
                 }
-                // Is King attacked?
-                for (let r = 0; r < 8; r++) {
-                    for (let c = 0; c < 8; c++) {
-                        const p = tempBoard[r][c];
-                        if (p && this.getPieceColor(p) !== color) {
-                            const attacks = this.getRawMoves(r, c, tempBoard);
-                            if (attacks.some(m => m.r === kr && m.c === kc)) return true;
-                        }
+                if (type === 'n') return (absDr === 2 && absDc === 1) || (absDr === 1 && absDc === 2);
+                if (type === 'k') return absDr <= 1 && absDc <= 1;
+                if (type === 'r' || type === 'q' || type === 'b') {
+                    const isStraight = (dr === 0 || dc === 0);
+                    const isDiag = (absDr === absDc);
+                    if (type === 'r' && !isStraight) return false;
+                    if (type === 'b' && !isDiag) return false;
+                    if (type === 'q' && !isStraight && !isDiag) return false;
+                    
+                    // Obstacle check
+                    const stepR = dr === 0 ? 0 : dr / absDr;
+                    const stepC = dc === 0 ? 0 : dc / absDc;
+                    let currR = r + stepR, currC = c + stepC;
+                    while (currR !== tr || currC !== tc) {
+                        if (this.board[currR][currC] !== null) return false;
+                        currR += stepR; currC += stepC;
                     }
+                    return true;
                 }
                 return false;
             }
 
-            handleMoveAttempt(from, to) {
-                const piece = this.board[from.r][from.c];
-                // Pawn Promotion?
-                if (piece.toLowerCase() === 'p' && (to.r === 0 || to.r === 7)) {
-                    this.showPromotion(from, to);
-                } else {
-                    this.executeMove(from, to);
-                    if (this.conn) this.conn.send({ type: 'move', from, to });
+            wouldBeInCheck(fr, fc, tr, tc) {
+                const color = (this.board[fr][fc] === this.board[fr][fc].toUpperCase()) ? 'white' : 'black';
+                const originalTarget = this.board[tr][tc];
+                const originalPiece = this.board[fr][fc];
+                
+                // Simulate
+                this.board[tr][tc] = originalPiece;
+                this.board[fr][fc] = null;
+                
+                let inCheck = false;
+                // Find king
+                let kr, kc;
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        if (this.board[r][c] === (color === 'white' ? 'K' : 'k')) { kr = r; kc = c; }
+                    }
                 }
-            }
-
-            executeMove(from, to, promo = null) {
-                let piece = this.board[from.r][from.c];
-                if (promo) piece = this.currentTurn === 'white' ? promo.toUpperCase() : promo.toLowerCase();
-                
-                this.board[to.r][to.c] = piece;
-                this.board[from.r][from.c] = null;
-                
-                this.currentTurn = this.currentTurn === 'white' ? 'black' : 'white';
-                this.selectedSquare = null;
-                this.legalMoves = [];
-                this.updateUI();
-                this.render();
+                // Check if any opponent piece can hit this king
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = this.board[r][c];
+                        if (p && (p === p.toUpperCase() ? 'white' : 'black') !== color) {
+                            if (this.isPseudoLegal(r, c, kr, kc)) { inCheck = true; break; }
+                        }
+                    }
+                }
+                // Revert
+                this.board[fr][fc] = originalPiece;
+                this.board[tr][tc] = originalTarget;
+                return inCheck;
             }
 
             showPromotion(from, to) {
                 const modal = document.getElementById('promotionModal');
-                const container = document.getElementById('promotionOptions');
-                container.innerHTML = '';
-                const options = ['q', 'r', 'b', 'n'];
-                options.forEach(o => {
+                const box = document.getElementById('promo-options');
+                box.innerHTML = '';
+                ['q', 'r', 'b', 'n'].forEach(type => {
                     const btn = document.createElement('div');
-                    btn.className = 'promo-btn';
-                    btn.innerText = SYMBOLS[this.currentTurn === 'white' ? o.toUpperCase() : o];
+                    btn.className = 'promo-choice';
+                    btn.innerText = SYMBOLS[this.turn === 'white' ? type.toUpperCase() : type];
                     btn.onclick = () => {
                         modal.style.display = 'none';
-                        this.executeMove(from, to, o);
-                        if (this.conn) this.conn.send({ type: 'move', from, to, promotion: o });
+                        this.executeMove(from, to, type);
+                        this.conn.send({ type: 'move', from, to, promo: type });
                     };
-                    container.appendChild(btn);
+                    box.appendChild(btn);
                 });
                 modal.style.display = 'flex';
             }
 
-            updateUI() {
-                const ind = document.getElementById('turnIndicator');
-                ind.innerText = `${this.currentTurn.charAt(0).toUpperCase() + this.currentTurn.slice(1)}'s Turn`;
-                ind.className = `turn-indicator ${this.currentTurn}-turn`;
-            }
+            render() {
+                const pLayer = document.getElementById('pieces-layer');
+                pLayer.innerHTML = '';
+                
+                // Reset square highlights
+                document.querySelectorAll('.square').forEach(s => s.classList.remove('selected', 'possible'));
 
-            isEmpty(r, c, board) { return board[r][c] === null; }
-            onBoard(r, c) { return r >= 0 && r < 8 && c >= 0 && c < 8; }
+                if (this.selected) {
+                    const selSq = document.querySelector(`rect[data-r="${this.selected.r}"][data-c="${this.selected.c}"]`);
+                    selSq.classList.add('selected');
+                    this.moves.forEach(m => {
+                        document.querySelector(`rect[data-r="${m.r}"][data-c="${m.c}"]`).classList.add('possible');
+                    });
+                }
 
-            flipBoard() {
-                this.isFlipped = !this.isFlipped;
-                document.getElementById('chessboard').style.transform = this.isFlipped ? 'rotate(180deg)' : '';
-                document.querySelectorAll('.piece text').forEach(t => t.style.transform = this.isFlipped ? 'rotate(180deg)' : '');
-                // Correct text orientation is tricky with SVG rotate, but CSS transform on board is easiest.
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = this.board[r][c];
+                        if (p) {
+                            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                            text.setAttribute('x', c * 60 + 30);
+                            text.setAttribute('y', r * 60 + 48);
+                            text.setAttribute('text-anchor', 'middle');
+                            text.setAttribute('font-size', '50');
+                            text.setAttribute('class', 'piece');
+                            text.textContent = SYMBOLS[p];
+                            text.onclick = () => this.handleSquareClick(r, c);
+                            pLayer.appendChild(text);
+                        }
+                    }
+                }
+                document.getElementById('turn-text').innerText = this.turn.toUpperCase() + "'s Turn";
             }
         }
 
