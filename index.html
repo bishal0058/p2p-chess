@@ -1,92 +1,947 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>P2P GitHub Chess</title>
-    <!-- CSS for the board -->
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Chess Game</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
-        #board { width: 400px; margin: 20px; }
-        .controls { background: #f0f0f0; padding: 15px; border-radius: 8px; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+        }
+
+        .turn-indicator {
+            font-size: 1.2em;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .white-turn {
+            background: white;
+            color: #333;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .black-turn {
+            background: #333;
+            color: white;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .captured-pieces {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            min-height: 40px;
+        }
+
+        .captured-piece {
+            width: 30px;
+            height: 30px;
+            opacity: 0.7;
+        }
+
+        .board-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        #chessboard {
+            cursor: pointer;
+            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
+            transition: transform 0.3s ease;
+        }
+
+        #chessboard:hover {
+            transform: scale(1.02);
+        }
+
+        .square {
+            transition: fill 0.2s ease;
+        }
+
+        .square.light {
+            fill: #f0d9b5;
+        }
+
+        .square.dark {
+            fill: #b58863;
+        }
+
+        .square.highlight {
+            fill: #f6f669 !important;
+            opacity: 0.7;
+        }
+
+        .square.possible-move {
+            fill: #7fbf7f !important;
+            opacity: 0.5;
+        }
+
+        .square.selected {
+            fill: #ff6b6b !important;
+            opacity: 0.7;
+        }
+
+        .piece {
+            cursor: grab;
+            transition: transform 0.2s ease;
+            pointer-events: all;
+        }
+
+        .piece:hover {
+            transform: scale(1.1);
+        }
+
+        .piece.dragging {
+            cursor: grabbing;
+            opacity: 0.8;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .game-status {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .status-check {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffc107;
+        }
+
+        .status-checkmate {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+            animation: pulse 1s infinite;
+        }
+
+        .status-draw {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 2px solid #17a2b8;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .promotion-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .promotion-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .promotion-pieces {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .promotion-piece {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .promotion-piece:hover {
+            transform: scale(1.2);
+            background: #f0f0f0;
+        }
+
+        @media (max-width: 768px) {
+            .game-container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .game-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h2>P2P Chess (GitHub Free)</h2>
-    
-    <div class="controls">
-        <p><strong>Your ID:</strong> <span id="my-id">Loading...</span></p>
-        <input type="text" id="opp-id" placeholder="Paste Friend's ID here">
-        <button onclick="connectToFriend()">Connect & Play</button>
-        <p id="status">Status: Waiting for connection...</p>
+    <div class="game-container">
+        <h1>♔ SVG Chess Game ♚</h1>
+        
+        <div class="game-info">
+            <div class="turn-indicator white-turn" id="turnIndicator">
+                White's Turn
+            </div>
+            <div>
+                <div>White Captured:</div>
+                <div class="captured-pieces" id="whiteCaptured"></div>
+            </div>
+            <div>
+                <div>Black Captured:</div>
+                <div class="captured-pieces" id="blackCaptured"></div>
+            </div>
+        </div>
+
+        <div class="board-container">
+            <svg id="chessboard" width="480" height="480" viewBox="0 0 480 480">
+                <!-- Board squares will be generated here -->
+                <g id="squares"></g>
+                <g id="pieces"></g>
+            </svg>
+        </div>
+
+        <div class="controls">
+            <button onclick="game.reset()">New Game</button>
+            <button onclick="game.undo()">Undo Move</button>
+            <button onclick="game.flipBoard()">Flip Board</button>
+        </div>
+
+        <div id="gameStatus" class="game-status" style="display: none;"></div>
     </div>
 
-    <div id="board"></div>
-
-    <!-- Libraries -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <div class="promotion-modal" id="promotionModal">
+        <div class="promotion-content">
+            <h2>Choose Promotion Piece</h2>
+            <div class="promotion-pieces" id="promotionPieces"></div>
+        </div>
+    </div>
 
     <script>
-        var board = null;
-        var game = new Chess();
-        var peer = new Peer(); // Create a P2P ID
-        var conn = null;
-        var myColor = 'w';
+        class ChessGame {
+            constructor() {
+                this.board = this.initializeBoard();
+                this.currentTurn = 'white';
+                this.selectedPiece = null;
+                this.selectedSquare = null;
+                this.possibleMoves = [];
+                this.capturedPieces = { white: [], black: [] };
+                this.moveHistory = [];
+                this.boardFlipped = false;
+                this.isDragging = false;
+                this.dragPiece = null;
+                this.dragOffset = { x: 0, y: 0 };
+                
+                this.initializeSVG();
+                this.renderBoard();
+                this.renderPieces();
+                this.attachEventListeners();
+            }
 
-        // 1. Setup P2P ID
-        peer.on('open', (id) => {
-            document.getElementById('my-id').innerText = id;
-        });
+            initializeBoard() {
+                return [
+                    ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+                    ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+                    [null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null],
+                    [null, null, null, null, null, null, null, null],
+                    ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+                    ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+                ];
+            }
 
-        // 2. Listen for a friend connecting to YOU
-        peer.on('connection', (connection) => {
-            conn = connection;
-            myColor = 'b'; // If someone connects to you, you are Black
-            setupGame();
-            listenForMoves();
-            document.getElementById('status').innerText = "Status: Connected! You are BLACK.";
-        });
+            initializeSVG() {
+                const svg = document.getElementById('chessboard');
+                const squaresGroup = document.getElementById('squares');
+                
+                // Create board squares
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        square.setAttribute('x', col * 60);
+                        square.setAttribute('y', row * 60);
+                        square.setAttribute('width', 60);
+                        square.setAttribute('height', 60);
+                        square.setAttribute('class', `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`);
+                        square.setAttribute('data-row', row);
+                        square.setAttribute('data-col', col);
+                        squaresGroup.appendChild(square);
+                    }
+                }
+            }
 
-        // 3. Function to connect to a friend
-        function connectToFriend() {
-            var id = document.getElementById('opp-id').value;
-            conn = peer.connect(id);
-            myColor = 'w'; // If you start the connection, you are White
-            setupGame();
-            listenForMoves();
-            document.getElementById('status').innerText = "Status: Connected! You are WHITE.";
+            renderBoard() {
+                // Clear highlights
+                document.querySelectorAll('.square').forEach(square => {
+                    square.classList.remove('highlight', 'possible-move', 'selected');
+                });
+
+                // Highlight selected square and possible moves
+                if (this.selectedSquare) {
+                    const selectedEl = document.querySelector(`[data-row="${this.selectedSquare.row}"][data-col="${this.selectedSquare.col}"]`);
+                    if (selectedEl) selectedEl.classList.add('selected');
+                    
+                    this.possibleMoves.forEach(move => {
+                        const moveEl = document.querySelector(`[data-row="${move.row}"][data-col="${move.col}"]`);
+                        if (moveEl) moveEl.classList.add('possible-move');
+                    });
+                }
+            }
+
+            renderPieces() {
+                const piecesGroup = document.getElementById('pieces');
+                piecesGroup.innerHTML = '';
+
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const piece = this.board[row][col];
+                        if (piece) {
+                            const pieceSVG = this.createPieceSVG(piece, col * 60, row * 60);
+                            piecesGroup.appendChild(pieceSVG);
+                        }
+                    }
+                }
+            }
+
+            createPieceSVG(piece, x, y) {
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('class', 'piece');
+                g.setAttribute('data-piece', piece);
+                g.setAttribute('data-x', x);
+                g.setAttribute('data-y', y);
+                g.setAttribute('transform', `translate(${x + 30}, ${y + 30})`);
+
+                const color = piece === piece.toUpperCase() ? 'white' : 'black';
+                const pieceType = piece.toLowerCase();
+
+                switch(pieceType) {
+                    case 'p':
+                        g.innerHTML = this.getPawnSVG(color);
+                        break;
+                    case 'r':
+                        g.innerHTML = this.getRookSVG(color);
+                        break;
+                    case 'n':
+                        g.innerHTML = this.getKnightSVG(color);
+                        break;
+                    case 'b':
+                        g.innerHTML = this.getBishopSVG(color);
+                        break;
+                    case 'q':
+                        g.innerHTML = this.getQueenSVG(color);
+                        break;
+                    case 'k':
+                        g.innerHTML = this.getKingSVG(color);
+                        break;
+                }
+
+                return g;
+            }
+
+            getPawnSVG(color) {
+                const strokeColor = color === 'white' ? '#333' : '#fff';
+                const fillColor = color === 'white' ? '#fff' : '#333';
+                return `
+                    <circle cx="0" cy="0" r="20" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <circle cx="0" cy="-5" r="12" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <text x="0" y="5" text-anchor="middle" font-size="24" fill="${strokeColor}" font-family="Arial">♟</text>
+                `;
+            }
+
+            getRookSVG(color) {
+                const strokeColor = color === 'white' ? '#333' : '#fff';
+                const fillColor = color === 'white' ? '#fff' : '#333';
+                return `
+                    <rect x="-20" y="-20" width="40" height="40" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" rx="5"/>
+                    <rect x="-15" y="-15" width="30" height="30" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1"/>
+                    <text x="0" y="8" text-anchor="middle" font-size="28" fill="${strokeColor}" font-family="Arial">♜</text>
+                `;
+            }
+
+            getKnightSVG(color) {
+                const strokeColor = color === 'white' ? '#333' : '#fff';
+                const fillColor = color === 'white' ? '#fff' : '#333';
+                return `
+                    <ellipse cx="0" cy="0" rx="22" ry="20" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <text x="0" y="8" text-anchor="middle" font-size="28" fill="${strokeColor}" font-family="Arial">♞</text>
+                `;
+            }
+
+            getBishopSVG(color) {
+                const strokeColor = color === 'white' ? '#333' : '#fff';
+                const fillColor = color === 'white' ? '#fff' : '#333';
+                return `
+                    <polygon points="0,-22 -18,18 18,18" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <circle cx="0" cy="-5" r="8" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <text x="0" y="8" text-anchor="middle" font-size="28" fill="${strokeColor}" font-family="Arial">♝</text>
+                `;
+            }
+
+            getQueenSVG(color) {
+                const strokeColor = color === 'white' ? '#333' : '#fff';
+                const fillColor = color === 'white' ? '#fff' : '#333';
+                return `
+                    <polygon points="0,-25 -20,20 20,20" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <circle cx="0" cy="-8" r="10" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <circle cx="0" cy="-15" r="5" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <text x="0" y="8" text-anchor="middle" font-size="30" fill="${strokeColor}" font-family="Arial">♛</text>
+                `;
+            }
+
+            getKingSVG(color) {
+                const strokeColor = color === 'white' ? '#333' : '#fff';
+                const fillColor = color === 'white' ? '#fff' : '#333';
+                return `
+                    <rect x="-20" y="-20" width="40" height="35" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" rx="5"/>
+                    <rect x="-5" y="-30" width="10" height="15" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <rect x="-8" y="-33" width="16" height="5" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+                    <text x="0" y="8" text-anchor="middle" font-size="30" fill="${strokeColor}" font-family="Arial">♚</text>
+                `;
+            }
+
+            attachEventListeners() {
+                const svg = document.getElementById('chessboard');
+                
+                svg.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                svg.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                svg.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                svg.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
+                
+                // Touch events for mobile
+                svg.addEventListener('touchstart', (e) => this.handleTouchStart(e));
+                svg.addEventListener('touchmove', (e) => this.handleTouchMove(e));
+                svg.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+            }
+
+            handleMouseDown(e) {
+                const target = e.target.closest('.piece');
+                if (!target) return;
+
+                const piece = target.getAttribute('data-piece');
+                const x = parseInt(target.getAttribute('data-x'));
+                const y = parseInt(target.getAttribute('data-y'));
+                const col = Math.floor(x / 60);
+                const row = Math.floor(y / 60);
+
+                if (this.isCorrectTurn(piece)) {
+                    this.isDragging = true;
+                    this.dragPiece = target;
+                    this.dragOffset = {
+                        x: e.clientX - x - 30,
+                        y: e.clientY - y - 30
+                    };
+                    
+                    target.classList.add('dragging');
+                    this.selectPiece(row, col);
+                }
+            }
+
+            handleMouseMove(e) {
+                if (!this.isDragging || !this.dragPiece) return;
+
+                const svg = document.getElementById('chessboard');
+                const rect = svg.getBoundingClientRect();
+                const x = e.clientX - rect.left - this.dragOffset.x;
+                const y = e.clientY - rect.top - this.dragOffset.y;
+
+                this.dragPiece.style.transform = `translate(${x}px, ${y}px)`;
+            }
+
+            handleMouseUp(e) {
+                if (!this.isDragging || !this.dragPiece) return;
+
+                const svg = document.getElementById('chessboard');
+                const rect = svg.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const col = Math.floor(x / 60);
+                const row = Math.floor(y / 60);
+
+                if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+                    this.makeMove(row, col);
+                }
+
+                this.dragPiece.classList.remove('dragging');
+                this.dragPiece.style.transform = '';
+                this.isDragging = false;
+                this.dragPiece = null;
+            }
+
+            handleTouchStart(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousedown', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                e.target.dispatchEvent(mouseEvent);
+            }
+
+            handleTouchMove(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousemove', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                e.target.dispatchEvent(mouseEvent);
+            }
+
+            handleTouchEnd(e) {
+                e.preventDefault();
+                const mouseEvent = new MouseEvent('mouseup', {});
+                e.target.dispatchEvent(mouseEvent);
+            }
+
+            isCorrectTurn(piece) {
+                return (this.currentTurn === 'white' && piece === piece.toUpperCase()) ||
+                       (this.currentTurn === 'black' && piece === piece.toLowerCase());
+            }
+
+            selectPiece(row, col) {
+                const piece = this.board[row][col];
+                if (!piece || !this.isCorrectTurn(piece)) return;
+
+                this.selectedPiece = piece;
+                this.selectedSquare = { row, col };
+                this.possibleMoves = this.getPossibleMoves(row, col);
+                this.renderBoard();
+            }
+
+            getPossibleMoves(row, col) {
+                const piece = this.board[row][col];
+                const pieceType = piece.toLowerCase();
+                const moves = [];
+
+                switch(pieceType) {
+                    case 'p':
+                        moves.push(...this.getPawnMoves(row, col));
+                        break;
+                    case 'r':
+                        moves.push(...this.getRookMoves(row, col));
+                        break;
+                    case 'n':
+                        moves.push(...this.getKnightMoves(row, col));
+                        break;
+                    case 'b':
+                        moves.push(...this.getBishopMoves(row, col));
+                        break;
+                    case 'q':
+                        moves.push(...this.getQueenMoves(row, col));
+                        break;
+                    case 'k':
+                        moves.push(...this.getKingMoves(row, col));
+                        break;
+                }
+
+                return moves.filter(move => this.isValidMove(row, col, move.row, move.col));
+            }
+
+            getPawnMoves(row, col) {
+                const moves = [];
+                const piece = this.board[row][col];
+                const direction = piece === piece.toUpperCase() ? -1 : 1;
+                const startRow = piece === piece.toUpperCase() ? 6 : 1;
+
+                // Move forward one square
+                if (this.isInBounds(row + direction, col) && !this.board[row + direction][col]) {
+                    moves.push({ row: row + direction, col });
+
+                    // Move forward two squares from starting position
+                    if (row === startRow && !this.board[row + 2 * direction][col]) {
+                        moves.push({ row: row + 2 * direction, col });
+                    }
+                }
+
+                // Capture diagonally
+                [-1, 1].forEach(dx => {
+                    const newCol = col + dx;
+                    const newRow = row + direction;
+                    if (this.isInBounds(newRow, newCol)) {
+                        const target = this.board[newRow][newCol];
+                        if (target && this.isOpponent(piece, target)) {
+                            moves.push({ row: newRow, col: newCol });
+                        }
+                    }
+                });
+
+                return moves;
+            }
+
+            getRookMoves(row, col) {
+                const moves = [];
+                const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+                directions.forEach(([dr, dc]) => {
+                    for (let i = 1; i < 8; i++) {
+                        const newRow = row + dr * i;
+                        const newCol = col + dc * i;
+
+                        if (!this.isInBounds(newRow, newCol)) break;
+
+                        const target = this.board[newRow][newCol];
+                        if (!target) {
+                            moves.push({ row: newRow, col: newCol });
+                        } else {
+                            if (this.isOpponent(this.board[row][col], target)) {
+                                moves.push({ row: newRow, col: newCol });
+                            }
+                            break;
+                        }
+                    }
+                });
+
+                return moves;
+            }
+
+            getKnightMoves(row, col) {
+                const moves = [];
+                const jumps = [
+                    [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+                    [1, -2], [1, 2], [2, -1], [2, 1]
+                ];
+
+                jumps.forEach(([dr, dc]) => {
+                    const newRow = row + dr;
+                    const newCol = col + dc;
+
+                    if (this.isInBounds(newRow, newCol)) {
+                        const target = this.board[newRow][newCol];
+                        if (!target || this.isOpponent(this.board[row][col], target)) {
+                            moves.push({ row: newRow, col: newCol });
+                        }
+                    }
+                });
+
+                return moves;
+            }
+
+            getBishopMoves(row, col) {
+                const moves = [];
+                const directions = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+                directions.forEach(([dr, dc]) => {
+                    for (let i = 1; i < 8; i++) {
+                        const newRow = row + dr * i;
+                        const newCol = col + dc * i;
+
+                        if (!this.isInBounds(newRow, newCol)) break;
+
+                        const target = this.board[newRow][newCol];
+                        if (!target) {
+                            moves.push({ row: newRow, col: newCol });
+                        } else {
+                            if (this.isOpponent(this.board[row][col], target)) {
+                                moves.push({ row: newRow, col: newCol });
+                            }
+                            break;
+                        }
+                    }
+                });
+
+                return moves;
+            }
+
+            getQueenMoves(row, col) {
+                return [...this.getRookMoves(row, col), ...this.getBishopMoves(row, col)];
+            }
+
+            getKingMoves(row, col) {
+                const moves = [];
+                const directions = [
+                    [-1, -1], [-1, 0], [-1, 1],
+                    [0, -1], [0, 1],
+                    [1, -1], [1, 0], [1, 1]
+                ];
+
+                directions.forEach(([dr, dc]) => {
+                    const newRow = row + dr;
+                    const newCol = col + dc;
+
+                    if (this.isInBounds(newRow, newCol)) {
+                        const target = this.board[newRow][newCol];
+                        if (!target || this.isOpponent(this.board[row][col], target)) {
+                            moves.push({ row: newRow, col: newCol });
+                        }
+                    }
+                });
+
+                return moves;
+            }
+
+            isInBounds(row, col) {
+                return row >= 0 && row < 8 && col >= 0 && col < 8;
+            }
+
+            isOpponent(piece1, piece2) {
+                return (piece1 === piece1.toUpperCase()) !== (piece2 === piece2.toUpperCase());
+            }
+
+            isValidMove(fromRow, fromCol, toRow, toCol) {
+                // Simplified validation - in a real game, you'd check for check, checkmate, etc.
+                return true;
+            }
+
+            makeMove(toRow, toCol) {
+                if (!this.selectedSquare) return;
+
+                const { row: fromRow, col: fromCol } = this.selectedSquare;
+                
+                // Check if this is a valid move
+                const isValidMove = this.possibleMoves.some(move => move.row === toRow && move.col === toCol);
+                if (!isValidMove) {
+                    this.clearSelection();
+                    return;
+                }
+
+                // Capture piece if present
+                const capturedPiece = this.board[toRow][toCol];
+                if (capturedPiece) {
+                    const color = capturedPiece === capturedPiece.toUpperCase() ? 'white' : 'black';
+                    this.capturedPieces[color].push(capturedPiece);
+                    this.updateCapturedPieces();
+                }
+
+                // Save move to history
+                this.moveHistory.push({
+                    from: { row: fromRow, col: fromCol },
+                    to: { row: toRow, col: toCol },
+                    piece: this.board[fromRow][fromCol],
+                    captured: capturedPiece
+                });
+
+                // Make the move
+                this.board[toRow][toCol] = this.board[fromRow][fromCol];
+                this.board[fromRow][fromCol] = null;
+
+                // Check for pawn promotion
+                const piece = this.board[toRow][toCol];
+                if (piece.toLowerCase() === 'p' && (toRow === 0 || toRow === 7)) {
+                    this.showPromotionDialog(toRow, toCol);
+                } else {
+                    this.finishTurn();
+                }
+            }
+
+            showPromotionDialog(row, col) {
+                const modal = document.getElementById('promotionModal');
+                const piecesContainer = document.getElementById('promotionPieces');
+                const color = this.board[row][col] === this.board[row][col].toUpperCase() ? 'white' : 'black';
+                
+                piecesContainer.innerHTML = '';
+                ['q', 'r', 'b', 'n'].forEach(pieceType => {
+                    const pieceDiv = document.createElement('div');
+                    pieceDiv.className = 'promotion-piece';
+                    pieceDiv.innerHTML = this.createPieceSVG(
+                        color === 'white' ? pieceType.toUpperCase() : pieceType,
+                        0, 0
+                    ).outerHTML;
+                    
+                    pieceDiv.addEventListener('click', () => {
+                        this.board[row][col] = color === 'white' ? pieceType.toUpperCase() : pieceType;
+                        modal.style.display = 'none';
+                        this.finishTurn();
+                    });
+                    
+                    piecesContainer.appendChild(pieceDiv);
+                });
+                
+                modal.style.display = 'flex';
+            }
+
+            finishTurn() {
+                this.clearSelection();
+                this.currentTurn = this.currentTurn === 'white' ? 'black' : 'white';
+                this.updateTurnIndicator();
+                this.renderPieces();
+                this.checkGameStatus();
+            }
+
+            clearSelection() {
+                this.selectedPiece = null;
+                this.selectedSquare = null;
+                this.possibleMoves = [];
+                this.renderBoard();
+            }
+
+            updateTurnIndicator() {
+                const indicator = document.getElementById('turnIndicator');
+                indicator.textContent = `${this.currentTurn.charAt(0).toUpperCase() + this.currentTurn.slice(1)}'s Turn`;
+                indicator.className = `turn-indicator ${this.currentTurn}-turn`;
+            }
+
+            updateCapturedPieces() {
+                ['white', 'black'].forEach(color => {
+                    const container = document.getElementById(`${color}Captured`);
+                    container.innerHTML = '';
+                    this.capturedPieces[color].forEach(piece => {
+                        const pieceSVG = this.createPieceSVG(piece, 0, 0);
+                        pieceSVG.classList.add('captured-piece');
+                        container.appendChild(pieceSVG);
+                    });
+                });
+            }
+
+            checkGameStatus() {
+                const status = document.getElementById('gameStatus');
+                
+                // Simplified check - in a real game, you'd implement proper check/checkmate detection
+                const hasKing = { white: false, black: false };
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const piece = this.board[row][col];
+                        if (piece && piece.toLowerCase() === 'k') {
+                            const color = piece === piece.toUpperCase() ? 'white' : 'black';
+                            hasKing[color] = true;
+                        }
+                    }
+                }
+
+                if (!hasKing.white || !hasKing.black) {
+                    const winner = hasKing.white ? 'White' : 'Black';
+                    status.textContent = `Checkmate! ${winner} Wins!`;
+                    status.className = 'game-status status-checkmate';
+                    status.style.display = 'block';
+                }
+            }
+
+            reset() {
+                this.board = this.initializeBoard();
+                this.currentTurn = 'white';
+                this.selectedPiece = null;
+                this.selectedSquare = null;
+                this.possibleMoves = [];
+                this.capturedPieces = { white: [], black: [] };
+                this.moveHistory = [];
+                
+                this.updateTurnIndicator();
+                this.updateCapturedPieces();
+                this.renderBoard();
+                this.renderPieces();
+                
+                const status = document.getElementById('gameStatus');
+                status.style.display = 'none';
+            }
+
+            undo() {
+                if (this.moveHistory.length === 0) return;
+
+                const lastMove = this.moveHistory.pop();
+                this.board[lastMove.from.row][lastMove.from.col] = lastMove.piece;
+                this.board[lastMove.to.row][lastMove.to.col] = lastMove.captured;
+
+                if (lastMove.captured) {
+                    const color = lastMove.captured === lastMove.captured.toUpperCase() ? 'white' : 'black';
+                    this.capturedPieces[color].pop();
+                    this.updateCapturedPieces();
+                }
+
+                this.currentTurn = this.currentTurn === 'white' ? 'black' : 'white';
+                this.updateTurnIndicator();
+                this.renderPieces();
+            }
+
+            flipBoard() {
+                const svg = document.getElementById('chessboard');
+                this.boardFlipped = !this.boardFlipped;
+                
+                if (this.boardFlipped) {
+                    svg.style.transform = 'rotate(180deg)';
+                } else {
+                    svg.style.transform = 'rotate(0deg)';
+                }
+            }
         }
 
-        function listenForMoves() {
-            conn.on('data', (data) => {
-                game.move(data);
-                board.position(game.fen());
-            });
-        }
-
-        // 4. Chess Logic (What happens when you move a piece)
-        function onDrop(source, target) {
-            // Check if it's your turn
-            if (game.turn() !== myColor) return 'snapback';
-
-            var move = game.move({ from: source, to: target, promotion: 'q' });
-            if (move === null) return 'snapback';
-
-            // Send the move to your friend over P2P
-            if (conn) conn.send(move);
-        }
-
-        function setupGame() {
-            var config = {
-                draggable: true,
-                position: 'start',
-                orientation: myColor === 'w' ? 'white' : 'black',
-                onDrop: onDrop
-            };
-            board = Chessboard('board', config);
-        }
+        // Initialize the game
+        const game = new ChessGame();
     </script>
 </body>
 </html>
