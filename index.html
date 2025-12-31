@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>P2P GitHub Chess</title>
+    <!-- CSS for the board -->
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+        #board { width: 400px; margin: 20px; }
+        .controls { background: #f0f0f0; padding: 15px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <h2>P2P Chess (GitHub Free)</h2>
+    
+    <div class="controls">
+        <p><strong>Your ID:</strong> <span id="my-id">Loading...</span></p>
+        <input type="text" id="opp-id" placeholder="Paste Friend's ID here">
+        <button onclick="connectToFriend()">Connect & Play</button>
+        <p id="status">Status: Waiting for connection...</p>
+    </div>
+
+    <div id="board"></div>
+
+    <!-- Libraries -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <script>
+        var board = null;
+        var game = new Chess();
+        var peer = new Peer(); // Create a P2P ID
+        var conn = null;
+        var myColor = 'w';
+
+        // 1. Setup P2P ID
+        peer.on('open', (id) => {
+            document.getElementById('my-id').innerText = id;
+        });
+
+        // 2. Listen for a friend connecting to YOU
+        peer.on('connection', (connection) => {
+            conn = connection;
+            myColor = 'b'; // If someone connects to you, you are Black
+            setupGame();
+            listenForMoves();
+            document.getElementById('status').innerText = "Status: Connected! You are BLACK.";
+        });
+
+        // 3. Function to connect to a friend
+        function connectToFriend() {
+            var id = document.getElementById('opp-id').value;
+            conn = peer.connect(id);
+            myColor = 'w'; // If you start the connection, you are White
+            setupGame();
+            listenForMoves();
+            document.getElementById('status').innerText = "Status: Connected! You are WHITE.";
+        }
+
+        function listenForMoves() {
+            conn.on('data', (data) => {
+                game.move(data);
+                board.position(game.fen());
+            });
+        }
+
+        // 4. Chess Logic (What happens when you move a piece)
+        function onDrop(source, target) {
+            // Check if it's your turn
+            if (game.turn() !== myColor) return 'snapback';
+
+            var move = game.move({ from: source, to: target, promotion: 'q' });
+            if (move === null) return 'snapback';
+
+            // Send the move to your friend over P2P
+            if (conn) conn.send(move);
+        }
+
+        function setupGame() {
+            var config = {
+                draggable: true,
+                position: 'start',
+                orientation: myColor === 'w' ? 'white' : 'black',
+                onDrop: onDrop
+            };
+            board = Chessboard('board', config);
+        }
+    </script>
+</body>
+</html>
